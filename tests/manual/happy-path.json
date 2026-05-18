@@ -1,0 +1,48 @@
+{
+  "externalId": "ACT-20251017-001",
+  "description": "Activate WiFi service for VFZ customer",
+  "orderItem": {
+    "id": "1",
+    "service": {
+      "id": "",
+      "serviceSpecification": {
+        "id": "SPEC-WIFI-001",
+        "name": "WiFi Service"
+      },
+      "serviceCharacteristic": [
+        {
+          "name": "customerId",
+          "valueType": "string",
+          "value": {
+            "@type": "string",
+            "customerId": "CUST-4589"
+          }
+        },
+        {
+          "name": "customerName",
+          "valueType": "string",
+          "value": {
+            "@type": "string",
+            "customerName": "Alice Johnson"
+          }
+        },
+        {
+          "name": "customerAddress",
+          "valueType": "string",
+          "value": {
+            "@type": "string",
+            "customerAddress": "Keizersgracht 123, 1015 CJ Amsterdam, Netherlands"
+          }
+        },
+        {
+          "name": "speedProfile",
+          "valueType": "string",
+          "value": {
+            "@type": "string",
+            "speedProfile": "SP-500"
+          }
+        }
+      ]
+    }
+  }
+}

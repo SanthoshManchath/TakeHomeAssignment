@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Include>[WifiProvisioning.*]*</Include>
+          <Exclude>[WifiProvisioning.Tests]*,[*]Microsoft.AspNetCore.OpenApi.Generated.*</Exclude>
+          <ExcludeByFile>**/Program.cs</ExcludeByFile>
+          <ExcludeByAttribute>System.CodeDom.Compiler.GeneratedCodeAttribute,System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

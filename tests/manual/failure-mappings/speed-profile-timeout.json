@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/speed-profiles"
+  },
+  "response": {
+    "status": 200,
+    "fixedDelayMilliseconds": 15000,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "id": "REQ-1",
+      "speedProfiles": [
+        { "profileId": "S123", "downloadMbps": 250, "uploadMbps": 50 }
+      ]
+    }
+  }
+}

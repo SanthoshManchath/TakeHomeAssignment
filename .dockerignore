@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/TestResults/
+**/.vs/
+**/.vscode/
+**/.idea/
+.git/
+*.md
+docs/
+wiremock/
+coverage.runsettings
+README.md
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose*.yml

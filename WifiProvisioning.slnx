@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WifiProvisioning.Api/WifiProvisioning.Api.csproj" />
+    <Project Path="src/WifiProvisioning.Core/WifiProvisioning.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WifiProvisioning.Tests/WifiProvisioning.Tests.csproj" />
+  </Folder>
+</Solution>

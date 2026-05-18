@@ -1,33 +1,70 @@
-## 📄 Take-Home Assignment — O&Si Developer
+# WiFi Provisioning API
 
-### 🧠 Objective
+A REST API that activates a customer's WiFi service by orchestrating two downstream APIs:
 
-Clone this repository and build a small REST API that can **activate WiFi for a customer**.
+1. **Network Infrastructure API** — returns the catalog of available speed profiles.
+2. **Network Controller API** — performs the actual activation on network gear.
 
-### 📘 Background
-
-When a customer purchases WiFi service at **Vodafone Ziggo**, a store front officer
-enters the customer's details into a portal. This portal will send customer data to
-**your API** in JSON format.
-
-To activate the WiFi, your API must:
-
-1. **Receive** the customer data.
-2. **Fetch additional network information** from the Network Infrastructure API.
-3. **Assemble a payload** using both sources of information.
-4. **Send a request** to the **network controller** to activate the WiFi service.
+Built with C# / .NET 10 / ASP.NET Core. Stubbed with WireMock for local development.
 
 ---
 
-### Component overview
+## Quickstart
 
-![Diagram](docs/OnboardingAssignmentContainer.png)
+```bash
+docker compose up --build
+```
+
+This starts:
+
+- **WireMock** (stubbed downstream APIs) on `http://localhost:8080`
+- **WiFi Provisioning API** on `http://localhost:5080`
+
+Once up, run the manual test scenarios:
+
+```bash
+./tests/manual/run-scenarios.sh
+```
+
+You should see 8 scenarios pass.
 
 ---
 
-### 📥 Input: Customer Data
+## Project structure
 
-Your API will receive a request from the customer portal with the following JSON data:
+```
+.
+├── src/
+│   ├── WifiProvisioning.Core/        Business logic, no web/HTTP concerns
+│   │   ├── Configuration/            Strongly-typed options for downstream APIs
+│   │   ├── Exceptions/               Typed exception hierarchy
+│   │   ├── Mapping/                  TM Forum → domain model mapping
+│   │   ├── Models/
+│   │   │   ├── Domain/               Clean internal models
+│   │   │   └── Input/                TM Forum-shaped DTOs
+│   │   └── Services/                 HTTP clients + orchestrator
+│   └── WifiProvisioning.Api/         ASP.NET Core host
+│       ├── Controllers/              ProvisioningController, HealthController
+│       └── Middleware/               ExceptionHandlingMiddleware
+├── tests/
+│   ├── WifiProvisioning.Tests/       Unit + integration tests (xUnit)
+│   └── manual/                       JSON fixtures + bash scenario runner
+├── wiremock/
+│   └── mappings/                     WireMock stubs for both downstream APIs
+├── Dockerfile                        Multi-stage build, non-root runtime
+├── docker-compose.yml                Brings up API + WireMock together
+└── coverage.runsettings              Test coverage configuration
+```
+
+---
+
+## Endpoints
+
+### `POST /api/provisioning`
+
+Provisions WiFi service for a customer.
+
+**Request** (TM Forum-style order):
 
 ```json
 {
@@ -80,82 +117,145 @@ Your API will receive a request from the customer portal with the following JSON
 }
 ```
 
----
-
-### 🌐 External Dependency: Network Infrastructure API
-
-To complete the activation, you need to retrieve the actual speeds associated with the speed profile from the
-Network Infrastructure API. This API will return the following data:
+**Success response** (`200 OK`):
 
 ```json
 {
-  "requestId": "",
-  "speedProfiles": [
-    {
-      "code": "SP-100",
-      "downloadSpeedMbps": 100,
-      "uploadSpeedMbps": 20
-    },
-    {
-      "code": "SP-300",
-      "downloadSpeedMbps": 300,
-      "uploadSpeedMbps": 50
-    },
-    {
-      "code": "SP-500",
-      "downloadSpeedMbps": 500,
-      "uploadSpeedMbps": 100
-    },
-    {
-      "code": "SP-1000",
-      "downloadSpeedMbps": 1000,
-      "uploadSpeedMbps": 200
-    }
-  ]
+    "orderId": "ACT-20251017-001",
+    "activationId": "ACT-a6297564-f813-45c8-8815-6a749f2fc3ee",
+    "status": "ACTIVE",
+    "profileId": "SP-500",
+    "downloadSpeedMbps": 500,
+    "uploadSpeedMbps": 100,
+    "activatedAt": "2026-05-18T12:24:24+00:00"
 }
 ```
 
+### `GET /health`
+
+Returns 200 with a `{"status":"healthy","timestamp":"..."}` payload. Used by Docker's `HEALTHCHECK`.
+
 ---
 
-### 📤 Output: Activation Request to Network Controller
+## Error handling
 
-After combining the data, create a request to activate the WiFi service for the customer.
-The Network API expects a payload in the following format.
+All errors return RFC 7807 ProblemDetails (`application/problem+json`):
 
-```json
-{
-  "customerId": "<customerId>",
-  "customerAddress": "<customerAddress>",
-  "upstreamSpeed": "<uploadSpeedMbps>",
-  "downstreamSpeed": "<downloadSpeedMbps>"
-}
+| Scenario | HTTP status |
+| --- | --- |
+| Request body fails structural validation (missing required field) | `400 Bad Request` |
+| Request body has structurally valid JSON but missing required characteristic (`speedProfile`, `customerId`, etc.) | `400 Bad Request` |
+| Speed code not in the Network Infrastructure catalog | `404 Not Found` |
+| Network Infrastructure API times out | `504 Gateway Timeout` |
+| Network Infrastructure API returns 5xx or network error | `502 Bad Gateway` |
+| Network Controller API times out | `504 Gateway Timeout` |
+| Network Controller API returns 5xx or network error | `502 Bad Gateway` |
+| Unexpected exception | `500 Internal Server Error` |
+
+Every error response includes a `traceId` (the request's `HttpContext.TraceIdentifier`) for correlation with server logs.
+
+---
+
+## Running tests
+
+### Unit + integration tests
+
+```bash
+dotnet test
 ```
 
+~33 tests across the mapper, HTTP clients, orchestrator, validator, and end-to-end through `WebApplicationFactory`.
+
+### Test coverage
+
+```bash
+dotnet test --collect:"XPlat Code Coverage" --settings coverage.runsettings --results-directory ./TestResults
+
+reportgenerator \
+  -reports:"./TestResults/**/coverage.cobertura.xml" \
+  -targetdir:"./TestResults/CoverageReport" \
+  -reporttypes:"Html;TextSummary"
+
+cat ./TestResults/CoverageReport/Summary.txt
+```
+
+Current coverage:
+
+- **Line coverage: 97.7%**
+- **Branch coverage: 92.1%**
+
+The HTML report at `./TestResults/CoverageReport/index.html` shows per-class coverage.
+
+### Manual scenario tests
+
+With the stack running (`docker compose up`):
+
+```bash
+./tests/manual/run-scenarios.sh
+```
+
+Hits the running API with 11 scenarios (happy path, validation failures, missing speed, etc.) and prints PASS/FAIL for each. Failure scenarios verify the middleware correctly maps upstream failures (500 status codes, timeouts) to 502 Bad Gateway and 504 Gateway Timeout responses, end-to-end through the full pipeline including WireMock.
+
 ---
 
-### ✅ Requirements
+## Resilience
 
-The goal of this assignment is to activate the WiFi service of a customer by sending the correct request to the Network Controller API.
-
-* Build a REST API using C# with the .NET framework.
-* Your API should:
-    * Accept the incoming customer request.
-    * Fetch additional data from the Network Infrastructure API.
-    * Construct the required payload.
-    * Send the activation request to the Network Controller API.
-    * Return an appropriate HTTP response indicating success or failure.
-* Mock the Network Infrastructure API and Network Controller API with [WireMock](https://wiremock.org/docs/).
-* Create a unit test to proof that you can send the correct request to the Network Controller API.
-* Include instructions on how to run your solution (e.g. in a README).
-* Push your project to a Git repository.
+- **Timeouts**: each downstream `HttpClient` has a configurable `Timeout` (10s for Speed Profile, 15s for Activation by default). On timeout, requests are wrapped in `SpeedProfileServiceException` / `ActivationServiceException` and surfaced as `504 Gateway Timeout`.
+- **Cancellation**: a `CancellationToken` is threaded through the entire request pipeline. If the client disconnects, all downstream calls are aborted.
+- **Retries**: not implemented (deliberately scoped out).
 
 ---
 
-### 💡 Bonus (Optional)
+## Design decisions and assumptions
 
-* Achieve at least 80% test coverage.
-* Create a Docker image for your solution and include a Dockerfile in your project.
-* Implement error handling and logging:
-  * Handle network timeouts, or missing JSON fields.
-  * Return clear and meaningful HTTP status codes and messages (e.g., 400 Bad Request, 404 Not Found, 500 Internal Server Error).
-  * Include structured error responses in JSON format.
+Decisions worth noting that are not obvious from the code alone:
+
+- **`.NET 10`** is used rather than legacy `.NET Framework` 4.x. Modern .NET runs cross-platform (Linux/macOS/Windows) and inside standard Linux Docker containers.
+- **Three-project layout** (`Core`, `Api`, `Tests`). Core has zero web/HTTP dependencies, making it trivially testable. Api references Core; Tests reference both.
+- **TM Forum input + domain model split**: the wire format (`ProvisioningOrderRequest` with nested `oorderItem.service.serviceSpecification/servCharacteristic`) is mapped at the edge to a clean flat domain model (`ProvisioningRequest`). Business logic operates exclusively on the domain model.
+- **Speed profile selection is client-side**: the Speed Profile API always returns the full catalog of available profiles regardless of input, so the orchestrator sends no request body and filters the response locally. The match is made on the `code` field of each returned profile against the `speedProfile` value extracted from the incoming TM Forum order (e.g., a request with `"speedProfile": "S123"` resolves to the profile with `"code": "S123"`). 
+- **Network Controller is assumed synchronous**: the activation response contains `status` and `activatedAt`, suggesting the upstream completes activation before responding. The orchestrator passes through whatever status is returned, so an asynchronous upstream that returns `status: "PENDING"` would also work — the intermediate status would propagate to the caller.
+- **Speed values flow `int → string`**: `SpeedProfile.DownloadMbps`/`UploadMbps` are typed as `int` (catalog data), while `ActivationRequest.DownloadMbps`/`UploadMbps` are typed as `string` (matching the assumed Network Controller wire format). The orchestrator converts via `int.ToString()`.
+
+---
+
+## Configuration
+
+Settings live in `src/WifiProvisioning.Api/appsettings.json` and are overrideable via environment variables. Compose injects production values:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `SpeedProfileApi:BaseUrl` | `http://localhost:8080` | Base URL of the Network Infrastructure API |
+| `SpeedProfileApi:TimeoutSeconds` | `10` | Request timeout |
+| `ActivationApi:BaseUrl` | `http://localhost:8080` | Base URL of the Network Controller API |
+| `ActivationApi:TimeoutSeconds` | `15` | Request timeout |
+
+Environment variables use `__` for nested keys (e.g., `SpeedProfileApi__BaseUrl`).
+
+---
+
+## WireMock stubs
+
+`wiremock/mappings/` contains:
+
+- `speed-profiles.json` — `GET /speed-profiles` returns a catalog with profiles `S100`, `S500`, `S1000`, `S123`.
+- `activation.json` — `POST /activation` returns `{ activationId: "ACT-<uuid>", status: "ACTIVE", activatedAt: <now> }` (UUID and timestamp generated per request via WireMock's response templating).
+
+To simulate failures, edit a mapping (e.g., change `"status": 200` to `"status": 500`) and `docker compose restart wiremock`.
+
+---
+
+## Manual chaos testing
+
+To verify the 502 mapping in a running stack:
+
+```bash
+docker compose up -d
+docker compose stop wiremock
+curl -i -X POST http://localhost:5080/api/provisioning \
+  -H 'Content-Type: application/json' \
+  -d @tests/manual/happy-path.json    # returns 502 Bad Gateway
+docker compose start wiremock
+
+---
+

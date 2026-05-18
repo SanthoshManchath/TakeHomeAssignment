@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPath": "/activation"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "activationId": "ACT-{{randomValue type='UUID'}}",
+      "status": "ACTIVE",
+      "activatedAt": "{{now}}"
+    },
+    "transformers": ["response-template"]
+  }
+}
