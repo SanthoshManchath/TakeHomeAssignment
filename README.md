@@ -64,7 +64,7 @@ You should see 11 scenarios pass.
 
 Provisions WiFi service for a customer.
 
-**Request** (TM Forum-style order):
+**Request**:
 
 ```json
 {
