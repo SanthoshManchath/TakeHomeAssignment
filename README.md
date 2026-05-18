@@ -26,7 +26,7 @@ Once up, run the manual test scenarios:
 ./tests/manual/run-scenarios.sh
 ```
 
-You should see 8 scenarios pass.
+You should see 11 scenarios pass.
 
 ---
 
